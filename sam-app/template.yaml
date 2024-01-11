@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  sam-app
+
+  Sample SAM Template for sam-app
+
+Globals:
+  Function:
+    Timeout: 3
+    MemorySize: 128
+
+Resources:
+  HelloWorldFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: hello_world/
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+      Events:
+        HelloWorld:
+          Type: HttpApi
+          Properties:
+            Path: /hello
+            Method: get
+            ApiId:
+              Ref: MyHttpApi
+
+  MyLambdaAuthorizer:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda-authorizer/
+      Handler: authorizer.lambda_handler
+      Runtime: python3.9
+      Role: !GetAtt MyLambdaAuthorizerRole.Arn
+
+  MyLambdaAuthorizerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      # Policies:
+      #   - PolicyName: AllowApiGatewayInvoke
+      #     PolicyDocument:
+      #       Version: '2012-10-17'
+      #       Statement:
+      #         - Effect: Allow
+      #           Action: 'lambda:InvokeFunction'
+      #           Resource: '*'
+
+  MyHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: dev
+      Auth:
+        DefaultAuthorizer: MyLambdaAuthorizer
+        Authorizers:
+          MyLambdaAuthorizer:
+            FunctionArn: !GetAtt MyLambdaAuthorizer.Arn
+            AuthorizerPayloadFormatVersion: "2.0"
+            Identity:
+              Headers:
+                - Authorization
+              ReauthorizeEvery: 0
+
+Outputs:
+  HelloWorldApi:
+    Description: "API Gateway endpoint URL for dev stage for Hello World function"
+    Value: !Sub "https://${MyHttpApi}.execute-api.${AWS::Region}.amazonaws.com/dev/hello/"
+  HelloWorldFunction:
+    Description: "Hello World Lambda Function ARN"
+    Value: !GetAtt HelloWorldFunction.Arn
+  HelloWorldFunctionIamRole:
+    Description: "Implicit IAM Role created for Hello World function"
+    Value: !GetAtt HelloWorldFunctionRole.Arn
